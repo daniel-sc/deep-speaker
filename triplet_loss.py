@@ -1,8 +1,16 @@
 import logging
 
 import keras.backend as K
+import tensorflow as tf
 
 alpha = 0.2  # used in FaceNet https://arxiv.org/pdf/1503.03832.pdf
+
+
+def print_tensor(x, msg, summarize=6):
+    # log tensor structure (once):
+    logging.info('{}: {}'.format(msg, x))
+    # log tensor value (every evaluation):
+    return tf.Print(x, [x], message=msg, summarize=summarize)
 
 
 def batch_cosine_similarity(x1, x2):
@@ -46,11 +54,13 @@ def deep_speaker_loss(y_true, y_pred):
     logging.info('negative_ex={}'.format(negative_ex))
 
     sap = batch_cosine_similarity(anchor, positive_ex)
-    logging.info('sap={}'.format(sap))
     san = batch_cosine_similarity(anchor, negative_ex)
-    logging.info('san={}'.format(san))
+    sap = print_tensor(sap, 'sap')
+    san = print_tensor(san, 'san')
+
     loss = K.maximum(san - sap + alpha, 0.0)
-    logging.info('loss={}'.format(loss))
+    loss = print_tensor(loss, 'loss')
+
     total_loss = K.sum(loss)
-    logging.info('total_loss={}'.format(total_loss))
+    total_loss = print_tensor(total_loss, 'total_loss')
     return total_loss

@@ -8,8 +8,30 @@ from constants import BATCH_NUM_TRIPLETS, DATASET_DIR, CHECKPOINT_FOLDER
 from librispeech_wav_reader import read_librispeech_structure
 from models import convolutional_model
 from next_batch import stochastic_mini_batch
-from triplet_loss import deep_speaker_loss
+from triplet_loss import deep_speaker_loss, alpha
 from utils import get_last_checkpoint_if_any, create_dir_and_delete_content
+
+
+def batch_cos_sim(a, b):
+    return np.sum(a * b, axis=1)
+
+
+def print_result(y):
+    logging.info('y:\n{}'.format(y))
+    logging.info('lengths: {}'.format(np.linalg.norm(y, axis=1)))
+    anchors = y[0:BATCH_NUM_TRIPLETS]
+    pos = y[BATCH_NUM_TRIPLETS:2 * BATCH_NUM_TRIPLETS]
+    neg = y[2 * BATCH_NUM_TRIPLETS:]
+    logging.info('shapes: anchors={} pos={} neg={}'.format(anchors.shape, pos.shape, neg.shape))
+    sap = batch_cos_sim(anchors, pos)
+    san = batch_cos_sim(anchors, neg)
+    logging.info('sap: {}'.format(sap))
+    logging.info('san: {}'.format(san))
+    pure_loss = san - sap + alpha
+    logging.info('pure_loss: {}'.format(pure_loss))
+    loss = np.maximum(pure_loss, np.zeros(pure_loss.shape))
+    logging.info('loss: {}'.format(loss))
+    logging.info('total loss: {}'.format(np.sum(loss)))
 
 
 def main(libri_dir=DATASET_DIR):
@@ -69,8 +91,15 @@ def main(libri_dir=DATASET_DIR):
         logging.info('-' * 80)
         logging.info('== Presenting batch #{0}'.format(grad_steps))
         logging.info(batch.libri_batch)
+        before = model.predict_on_batch(x)
         loss = model.train_on_batch(x, stub_targets)
         logging.info('== Processed in {0:.2f}s by the network, training loss = {1}.'.format(time() - orig_time, loss))
+        after = model.predict_on_batch(x)
+        logging.info('==before==')
+        print_result(before)
+        logging.info('==after==')
+        print_result(after)
+
         grad_steps += 1
         orig_time = time()
 
